@@ -1,0 +1,331 @@
+# command line calculator
+bc -ql
+
+# registers of x86 cpu: (EAX, ECX, EDX, EBX), (ESP, EBP, ESI, EDI)
+# are:  (general purpose for Accumulator, Counter, Data, and Base), 
+#       (general purposs, pointer or index, Stack Pointer, Base Pointer, Source Index, and Destination Index)
+
+# compile c with: gcc -g firstprog.c to get debug info
+# before every function execution: function prologe (added by compiler to run function)
+
+# disassemble function in program with objectdump
+objdump -M intel -D a.out | grep -A20 main.
+
+# gdb tricks
+# run gdb for executable: gdb -q ./test
+# list code (if not stripped): list
+# disassemble function: disassemble main
+# add break point: break main
+# run until next break point: run
+# show content of register: info register eip
+# coming instructions: x/2x $eip -> two next words (4 byte) in hex from current instruction pointer
+# next instructions: x/3i $eip -> 3 next instructions as assembly
+# check first var on stack: x/10x $ebp -> print *(int*)($ebp-4), print *(int*)($rbp-8) -> 32-bit and 64-bit access
+# run only next instruction: nexti
+# print string in stack: x/s 0x8048484
+# switch to assembler mode: layout asm
+
+# basic info elf from pwntools
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x3fc000)
+    RUNPATH:    b'/home/florian/Documents/master/4.Semester/SoftwareSecurity/exercise/2/examples'
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+# Architecture, RELocation Read-Only (protection of global offset table), Stack (canaries are used to detect boffer overflows)
+# NX (No-eXecute, if code can be executed on stack or heap, allows für code injection, otherwise need to use return oriented programming)
+# PIE (Position Independent Executable, if enabled code and libraries are loaded to random adresses)
+# SHSTK (Shadow Stack, seperate stack to protect return addresses and compare them before returning)
+# IBT (Indirect Branch Tracking, Intel tool of Control-flow Enforcement Technology to prevent some jumping attacks, also uses shadow stack)
+# Stripped (if the binary contains symbol information like function names)
+
+
+# check if binary is stripped
+objdump --syms ./homework
+
+# check if binary has IBT or SHSTK (Shadow stack)
+readelf -n ./homework | grep -A 2 "GNU_PROPERTY"
+
+# more elf info
+file ./homework
+
+# debug exploit
+# first termina
+tmux
+# second terminal run exploit with
+context.terminal = ['tmux', 'splitw', '-h']
+context.log_level = 'debug'
+p = process([exe.path])
+gdb.attach(p, '''break main''')
+
+# get base address for programs with PIE, ASLR using gdb
+# base address is address of my program with start at offset 0x0
+info proc mappings
+
+# gbd list break points
+info break
+
+# gbd get info about open program
+info file
+
+# gbd breakpoint at every print
+break printf
+# continue until next break poit ie. next printf (also multiple times at once)
+c
+c 12
+
+# search stack for pattern
+find $sp, $sp+0x10000, "AAAAAAAAAAAAAAA"
+
+# search heap for pattern
+find /s [heap_start], [heap_end], "your_input_pattern"
+
+# better approach to find mem buffer
+break memcpy
+x/s $rdi
+
+# get libc address leaked: gdb
+break printf
+c 29
+
+
+
+------------------------------------------------------------
+# recreated c code
+
+void 1_main(void)
+
+{
+  int iVar1;
+  long in_FS_OFFSET;
+  undefined1 auStack_65c88 [416886];
+  char local_12 [2];
+  undefined8 local_10;
+  
+  local_10 = *(undefined8 *)(in_FS_OFFSET + 0x28);
+  2_setIoPipes();
+  memset(auStack_65c88,0,0x65c70);
+  local_12[0] = '\0';
+  local_12[1] = '\0';
+  puts("Hello and welcome to my new experimental Fotispy app!");
+  puts("===========================");
+  do {
+     3_printOptions();
+     4_readInput(local_12,2);
+     iVar1 = atoi(local_12);
+     switch(iVar1) {
+     case 0:
+        5_registerUser(auStack_65c88);
+        break;
+     case 1:
+        7_userLogIn(auStack_65c88);
+        break;
+     case 2:
+        8_addFavSong(auStack_65c88);
+        break;
+     case 3:
+        9_listFavSongs(auStack_65c88);
+        break;
+     case 4:
+        puts("Bye bye");
+                          /* WARNING: Subroutine does not return */
+        exit(0);
+     }
+  } while( true );
+}
+
+void 2_setIoPipes(void)
+
+{
+  setvbuf(stdin,(char *)0x0,2,0);
+  setvbuf(stdout,(char *)0x0,2,0);
+  setvbuf(stderr,(char *)0x0,2,0);
+  return;
+}
+
+
+void 3_printOptions(void)
+
+{
+  puts("");
+  puts("[0] Register");
+  puts("[1] Log in");
+  puts("[2] Add a song to your favorites");
+  puts("[3] Display your favorites");
+  puts("[4] Exit");
+  printf("Please enter your choice [4]: ");
+  return;
+}
+
+
+int 4_readInput(long param_1,long param_2)
+
+{
+  int iVar1;
+  int local_c;
+  
+  local_c = 0;
+  while( true ) {
+     if (param_2 <= local_c) {
+        return local_c;
+     }
+     iVar1 = getc(stdin);
+     if ((char)iVar1 == '\n') break;
+     *(char *)(local_c + param_1) = (char)iVar1;
+     local_c = local_c + 1;
+  }
+  return local_c;
+}
+
+
+bool 5_registerUser(long param_1)
+
+{
+  char cVar1;
+  void *pvVar2;
+  void *pvVar3;
+  
+  cVar1 = 6_getUserBufferIndex(param_1);
+  if (cVar1 != -1) {
+     pvVar2 = calloc(0x20,1);
+     pvVar3 = calloc(0x40,1);
+     printf("[~] Please enter a username: ");
+     4_readInput(pvVar2,0x20);
+     printf("[~] Please enter a password: ");
+     4_readInput(pvVar3,0x40);
+     *(undefined1 *)(param_1 + (long)cVar1 * 0xa2d8 + 0x10) = 1;
+     *(void **)((long)cVar1 * 0xa2d8 + param_1) = pvVar2;
+     *(void **)((long)cVar1 * 0xa2d8 + param_1 + 8) = pvVar3;
+  }
+  return cVar1 != -1;
+}
+
+
+int 6_getUserBufferIndex(long param_1)
+
+{
+  int local_c;
+  
+  local_c = 0;
+  while( true ) {
+     if (9 < local_c) {
+        return -1;
+     }
+     if (*(char *)(param_1 + (long)local_c * 0xa2d8 + 0x10) != '\x01') break;
+     local_c = local_c + 1;
+  }
+  return local_c;
+}
+
+
+undefined8 7_userLogIn(long param_1)
+
+{
+  int iVar1;
+  char *__s1;
+  char *__s1_00;
+  int local_1c;
+  
+  __s1 = (char *)calloc(0x20,1);
+  __s1_00 = (char *)calloc(0x40,1);
+  printf("[~] Please enter a username: ");
+  4_readInput(__s1,0x20);
+  printf("[~] Please enter a password: ");
+  4_readInput(__s1_00,0x40);
+  local_1c = 0;
+  while( true ) {
+     if (9 < local_1c) {
+        printf("[-] %s could not be logged in\n",__s1);
+        return 0;
+     }
+     if (((*(char *)(param_1 + (long)local_1c * 0xa2d8 + 0x10) != '\0') &&
+          (iVar1 = strncmp(__s1,*(char **)(param_1 + (long)local_1c * 0 xa2d8),0x20), iVar1 == 0)) &&
+         (iVar1 = strncmp(__s1_00,*(char **)(param_1 + (long)local_1c * 0xa2d8 + 8),0x40), iVar1 == 0)
+         ) break;
+     local_1c = local_1c + 1;
+  }
+  DAT_00104070 = (undefined1)local_1c;
+  printf("[+] %s has been logged in\n",__s1);
+  return 1;
+}
+
+
+void 8_addFavSong(long param_1)
+
+{
+  byte bVar1;
+  undefined4 uVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  char *__s;
+  char *pcVar5;
+  
+  if (DAT_00104070 == 0xff) {
+     puts("[-] No user has logged in yet.");
+  }
+  else {
+     __s = (char *)calloc(0xa2c,1);
+     printf("[~] Please enter a song title: ");
+     uVar2 = 4_readInput(__s,0x500);
+     printf("[~] Please enter a who %s is from: ",__s);
+     uVar3 = 4_readInput(__s + 0x504,0x500);
+     printf("[~] Please enter which album %s is on: ",__s + 0xa0c);
+     uVar4 = 4_readInput(__s + 0xa0c,0x20);
+     *(undefined4 *)(__s + 0xa08) = uVar4;
+     *(undefined4 *)(__s + 0x500) = uVar2;
+     *(undefined4 *)(__s + 0xa04) = uVar3;
+     bVar1 = *(byte *)(param_1 + (ulong)DAT_00104070 * 0xa2d8 + 0x11);
+     if (bVar1 < 0x10) {
+        memcpy((void *)((long)(int)(uint)bVar1 * 0xa2c + (ulong)DAT_ 00104070 * 0xa2d8 + param_1 + 0x14
+                            ),__s,0xa2c);
+        pcVar5 = strchr(__s,0x25);
+        if (((pcVar5 == (char *)0x0) && (pcVar5 = strchr(__s + 0x504,0 x25), pcVar5 == (char *)0x0)) &&
+            (pcVar5 = strchr(__s + 0xa0c,0x25), pcVar5 == (char *)0x0)) {
+          param_1 = param_1 + (ulong)DAT_00104070 * 0xa2d8;
+          *(char *)(param_1 + 0x11) = *(char *)(param_1 + 0x11) + '\x0 1';
+          return;
+        }
+        puts("[-] Found an illegal character :");
+        free(__s);
+     }
+     else {
+        free(__s);
+        puts("[-] Favorites are full :");
+     }
+  }
+  return;
+}
+
+
+void 9_listFavSongs(long param_1)
+
+{
+  long lVar1;
+  int local_14;
+  
+  if (DAT_00104070 == 0xff) {
+     puts("[-] No user has logged in yet.");
+  }
+  else {
+     puts("[~] Your favorites:");
+     for (local_14 = 0;
+          local_14 < (int)(uint)*(byte *)(param_1 + (ulong)DAT_001040 70 * 0xa2d8 + 0x11);
+          local_14 = local_14 + 1) {
+        lVar1 = (long)local_14 * 0xa2c + (ulong)DAT_00104070 * 0xa2 d8 + param_1;
+        printf("    - ");
+        printf((char *)(lVar1 + 0x14));
+        printf(" - ");
+        printf((char *)(lVar1 + 0xa20));
+        printf(" - ");
+        printf((char *)(lVar1 + 0x518));
+        puts("\n");
+     }
+  }
+  return;
+}
+
+
+

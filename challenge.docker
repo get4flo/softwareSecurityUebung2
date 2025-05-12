@@ -1,0 +1,11 @@
+FROM debian:latest@sha256:18023f131f52fc3ea21973cabffe0b216c60b417fd2478e94d9d59981ebba6af
+
+WORKDIR /code
+
+RUN apt update
+RUN apt install -y socat
+
+COPY ./homework .
+COPY ./flag.txt .
+
+ENTRYPOINT socat TCP-LISTEN:1337,reuseaddr,fork EXEC:"./homework"

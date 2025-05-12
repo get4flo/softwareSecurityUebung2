@@ -1,0 +1,24 @@
+services:
+  homework:
+    build:
+      context: .
+      dockerfile: ./challenge.docker
+    ports:
+      - "1337:1337"
+    networks:
+      - exploit
+
+  exploit:
+    build:
+      context: .
+      dockerfile: ./exploiter.docker
+    networks:
+      - exploit
+    depends_on:
+      - homework
+    volumes:
+      - "./exploit.py:/code/exploit.py"
+
+networks:
+  exploit:
+    driver: bridge
